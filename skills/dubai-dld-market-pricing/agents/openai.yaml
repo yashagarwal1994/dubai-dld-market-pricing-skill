@@ -1,4 +1,4 @@
 interface:
   display_name: "Dubai DLD Prices"
   short_description: "Analyze Dubai DLD price trends"
-  default_prompt: "Use $dubai-dld-market-pricing to analyze recent Dubai DLD transaction price trends by area, or infer a target from Property Finder/Bayut listing URLs."
+  default_prompt: "Use $dubai-dld-market-pricing to run Dubai DLD analysis in trends/latest/property mode: area trend checks, latest city-wide transactions, or transaction-level down/up follow-up, including Property Finder/Bayut URL inference."

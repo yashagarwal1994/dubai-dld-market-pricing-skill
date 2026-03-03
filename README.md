@@ -15,6 +15,8 @@ Use when you need to answer questions like:
 - Is `AED/m2` trending up or down recently?
 - What is the transaction-value direction in recent weeks?
 - What are transaction-based trend signals for a specific Property Finder/Bayut listing area?
+- What are the latest sales transactions across all of Dubai right now?
+- For one transaction, is this property trending down or up vs prior comparable sales?
 
 ## Installation
 
@@ -32,6 +34,21 @@ npx skills add yashagarwal1994/dubai-dld-market-pricing-skill --list
 
 ```bash
 scripts/dubai_dld_price_trends.py --preset all --days 90 --windows 14,30
+```
+
+Fetch latest city-wide sales:
+
+```bash
+scripts/dubai_dld_price_trends.py --mode latest --latest-limit 25
+```
+
+Inspect one transaction against prior comparable sales:
+
+```bash
+scripts/dubai_dld_price_trends.py \
+  --mode property \
+  --transaction-id "1-102-2026-21388" \
+  --history-limit 20
 ```
 
 Lookup by society/area name:

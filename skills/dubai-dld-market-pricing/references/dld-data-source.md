@@ -20,14 +20,17 @@ https://data.dubai/o/dda/data-services/dataset-metadata?datasetId=470061&page=1&
 ## Fields Used By This Skill
 - `transaction_id`
 - `instance_date`
+- `area_id`
 - `trans_group_en`
 - `reg_type_en`
 - `master_project_en`
 - `project_name_en`
+- `project_number`
 - `building_name_en`
 - `area_name_en`
 - `property_type_en`
 - `property_sub_type_en`
+- `rooms_en`
 - `procedure_name_en`
 - `actual_worth`
 - `meter_sale_price`

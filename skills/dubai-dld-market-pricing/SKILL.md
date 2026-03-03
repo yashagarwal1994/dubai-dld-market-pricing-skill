@@ -1,6 +1,6 @@
 ---
 name: dubai-dld-market-pricing
-description: Analyze Dubai real-estate price movement using the official Dubai DLD open transactions feed on data.dubai. Use when asked whether prices are cooling or rising in specific communities, to compare recent windows versus prior windows (for example 14d or 30d), to look up prices for a society/area, or when given a Property Finder/Bayut listing URL to infer the target area from the link without exposing personal information.
+description: Analyze Dubai real-estate prices using the official Dubai DLD open transactions feed on data.dubai. Use when asked whether prices are cooling or rising in specific communities, to compare recent windows versus prior windows (for example 14d or 30d), to list the latest city-wide transactions, to inspect one transaction and check if it is down/up versus prior comparable sales, to look up prices for a society/area, or when given a Property Finder/Bayut listing URL to infer the target area from the link without exposing personal information.
 ---
 
 # Dubai DLD Market Pricing
@@ -9,11 +9,12 @@ description: Analyze Dubai real-estate price movement using the official Dubai D
 Use this skill to run repeatable, evidence-based pricing checks for Dubai communities using the public DLD transaction dataset. It is built for quick "is it cooling?" or "is it going up?" decisions based on recent closed transactions.
 
 ## Workflow
-1. Define target communities before fetching data.
+1. Pick the mode: `trends`, `latest`, or `property`.
 2. Run the analysis script against the official DLD endpoint.
-3. Compare recent windows against prior windows using medians.
-4. Report only aggregate metrics with sample sizes and dates.
-5. Add caveats when sample size is small.
+3. For `trends`, compare recent windows against prior windows using medians.
+4. For `latest`, return newest sales across all of Dubai.
+5. For `property`, compare selected transaction versus prior comparable sales.
+6. Report aggregate metrics with sample sizes, dates, and caveats when sparse.
 
 ## Run Analysis
 Use preset targets (Damac Hills 2, Emaar South, JLT, Reportage, Gemz Danube):
@@ -26,6 +27,22 @@ Use specific presets:
 
 ```bash
 scripts/dubai_dld_price_trends.py --preset damac-hills-2 --preset jlt --days 120
+```
+
+Fetch latest city-wide sales:
+
+```bash
+scripts/dubai_dld_price_trends.py --mode latest --latest-limit 25
+```
+
+Inspect one transaction and check if price moved down/up:
+
+```bash
+scripts/dubai_dld_price_trends.py \
+  --mode property \
+  --transaction-id "1-102-2026-21388" \
+  --property-area-tolerance-pct 5 \
+  --history-limit 20
 ```
 
 Use plain text area/society lookups:
@@ -68,6 +85,7 @@ scripts/dubai_dld_price_trends.py \
 - Treat outcomes with low counts (`n < 10`) as directional only.
 - If 14-day and 30-day deltas disagree, classify as mixed/noisy.
 - URL-derived targets rely on listing slug/query text; if matching is weak, add `--area` or explicit `--target`.
+- In `property` mode, if strict area matching is sparse, fallback uses broader same-profile comparables.
 
 ## Privacy Rules
 - Do not include private user data in prompts, outputs, or files.
