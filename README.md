@@ -1,0 +1,47 @@
+# Dubai DLD Market Pricing Skill
+
+A public Agent Skill repository for analyzing Dubai real-estate price direction using the official open DLD transaction feed.
+
+This repo is designed for installation with [`skills.sh`](https://skills.sh/) and follows the Agent Skills format.
+
+## Available Skills
+
+### dubai-dld-market-pricing
+
+Analyze Dubai community-level price movement from DLD transactions and compare recent windows vs prior windows (for example 14d and 30d).
+
+Use when you need to answer questions like:
+- Are prices cooling in a specific society/community?
+- Is `AED/m2` trending up or down recently?
+- What is the transaction-value direction in recent weeks?
+
+## Installation
+
+```bash
+npx skills add yashagarwal1994/dubai-dld-market-pricing-skill
+```
+
+List skills before install:
+
+```bash
+npx skills add yashagarwal1994/dubai-dld-market-pricing-skill --list
+```
+
+## Usage Example
+
+```bash
+scripts/dubai_dld_price_trends.py --preset all --days 90 --windows 14,30
+```
+
+## Data Source
+
+- Dataset page: https://data.dubai/en/web/guest/l/470061
+- API endpoint: https://data.dubai/o/dda/data-services/dataset-metadata
+
+## Privacy
+
+This skill is designed for aggregate analysis only. It intentionally focuses on non-personal transaction fields and summarizes results using counts, medians, and percentage deltas.
+
+## License
+
+MIT

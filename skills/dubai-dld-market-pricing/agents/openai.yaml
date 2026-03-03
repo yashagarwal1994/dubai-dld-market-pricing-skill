@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dubai DLD Prices"
+  short_description: "Analyze Dubai DLD price trends"
+  default_prompt: "Use $dubai-dld-market-pricing to analyze recent Dubai DLD transaction price trends by area."
