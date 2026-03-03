@@ -14,6 +14,7 @@ Use when you need to answer questions like:
 - Are prices cooling in a specific society/community?
 - Is `AED/m2` trending up or down recently?
 - What is the transaction-value direction in recent weeks?
+- What are transaction-based trend signals for a specific Property Finder/Bayut listing area?
 
 ## Installation
 
@@ -31,6 +32,21 @@ npx skills add yashagarwal1994/dubai-dld-market-pricing-skill --list
 
 ```bash
 scripts/dubai_dld_price_trends.py --preset all --days 90 --windows 14,30
+```
+
+Lookup by society/area name:
+
+```bash
+scripts/dubai_dld_price_trends.py --area "Jumeirah Lakes Towers" --days 120 --windows 14,30
+```
+
+Lookup directly from Property Finder / Bayut URLs:
+
+```bash
+scripts/dubai_dld_price_trends.py \
+  --source-url "https://www.propertyfinder.ae/en/plp/buy/apartment-for-sale-dubai-jumeirah-lake-towers-jlt-12345678.html" \
+  --source-url "https://www.bayut.com/for-sale/apartments/dubai/jumeirah-lake-towers-jlt/" \
+  --days 120 --windows 14,30
 ```
 
 ## Data Source

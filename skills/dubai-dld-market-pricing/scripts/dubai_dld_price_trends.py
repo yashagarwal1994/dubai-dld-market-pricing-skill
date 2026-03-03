@@ -73,6 +73,68 @@ PRESETS: Dict[str, Sequence[str]] = {
     ),
 }
 
+SUPPORTED_SOURCE_HOSTS = ("propertyfinder", "bayut")
+URL_HINT_QUERY_KEYS = {
+    "area",
+    "areas",
+    "community",
+    "location",
+    "project",
+    "building",
+    "tower",
+    "keyword",
+    "q",
+}
+URL_TOKEN_STOPWORDS = {
+    "a",
+    "ae",
+    "al",
+    "and",
+    "apartment",
+    "apartments",
+    "bayut",
+    "bed",
+    "beds",
+    "bedroom",
+    "bedrooms",
+    "buy",
+    "city",
+    "com",
+    "development",
+    "dubai",
+    "finder",
+    "for",
+    "home",
+    "homes",
+    "house",
+    "houses",
+    "in",
+    "listing",
+    "listings",
+    "plan",
+    "plp",
+    "price",
+    "prices",
+    "project",
+    "properties",
+    "property",
+    "propertyfinder",
+    "ready",
+    "rent",
+    "sale",
+    "studio",
+    "the",
+    "to",
+    "tower",
+    "townhouse",
+    "townhouses",
+    "unit",
+    "units",
+    "villa",
+    "villas",
+    "with",
+}
+
 
 @dataclass
 class TargetPattern:
@@ -124,6 +186,24 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Custom target in format name=regex1|regex2. "
             "Repeatable."
+        ),
+    )
+    parser.add_argument(
+        "--area",
+        action="append",
+        default=[],
+        help=(
+            "Plain-text area/society/building name. "
+            "Repeatable and converted to safe match patterns."
+        ),
+    )
+    parser.add_argument(
+        "--source-url",
+        action="append",
+        default=[],
+        help=(
+            "Property listing URL (Property Finder or Bayut). "
+            "The script infers target patterns from URL slugs/query."
         ),
     )
     parser.add_argument(
@@ -180,10 +260,161 @@ def parse_windows(raw: str) -> List[int]:
     return sorted(set(values))
 
 
-def parse_targets(presets: Sequence[str], custom_targets: Sequence[str]) -> List[TargetPattern]:
+def dedupe_strings(values: Iterable[str]) -> List[str]:
+    seen = set()
+    output: List[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        output.append(value)
+    return output
+
+
+def normalize_text_phrase(raw: str) -> str:
+    value = urllib.parse.unquote_plus(raw or "")
+    value = re.sub(r"\.(html?|php)$", " ", value, flags=re.IGNORECASE)
+    value = re.sub(r"[_/\-]+", " ", value)
+    value = re.sub(r"[^a-zA-Z0-9 ]+", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def tokenize_phrase(raw: str) -> List[str]:
+    words = re.findall(r"[a-z0-9]+", raw.lower())
+    tokens: List[str] = []
+    for word in words:
+        if word in URL_TOKEN_STOPWORDS:
+            continue
+        if word.isdigit() and len(word) >= 4:
+            continue
+        if len(word) == 1 and not word.isdigit():
+            continue
+        tokens.append(word)
+    return tokens
+
+
+def slugify_name(raw: str, max_words: int = 6) -> str:
+    tokens = tokenize_phrase(raw)
+    if not tokens:
+        tokens = re.findall(r"[a-z0-9]+", raw.lower())
+    return "-".join(tokens[:max_words]).strip("-")
+
+
+def tokens_to_regex(tokens: Sequence[str]) -> Optional[str]:
+    if not tokens:
+        return None
+    if all(token.isdigit() for token in tokens):
+        return None
+
+    def token_part(token: str) -> str:
+        if token.isdigit():
+            return re.escape(token)
+        if len(token) <= 3:
+            return re.escape(token)
+        if token.endswith("s"):
+            return re.escape(token[:-1]) + r"s?"
+        return re.escape(token) + r"s?"
+
+    return r"\b" + r"[\s\-]*".join(token_part(token) for token in tokens) + r"\b"
+
+
+def patterns_from_phrase(phrase: str) -> List[str]:
+    tokens = tokenize_phrase(phrase)
+    if not tokens:
+        return []
+
+    patterns: List[str] = []
+
+    full = tokens_to_regex(tokens[:5])
+    if full:
+        patterns.append(full)
+
+    for size in (2, 3):
+        if len(tokens) < size:
+            continue
+        for index in range(0, len(tokens) - size + 1):
+            candidate = tokens_to_regex(tokens[index : index + size])
+            if candidate:
+                patterns.append(candidate)
+
+    if len(tokens) == 1:
+        single = tokens_to_regex(tokens[:1])
+        if single:
+            patterns.append(single)
+
+    return dedupe_strings(patterns)[:12]
+
+
+def infer_target_from_source_url(source_url: str, index: int) -> Tuple[str, List[str]]:
+    parsed = urllib.parse.urlparse(source_url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError(f"Invalid --source-url '{source_url}'. Use a full http(s) URL.")
+
+    host = parsed.netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+
+    if not any(marker in host for marker in SUPPORTED_SOURCE_HOSTS):
+        supported = ", ".join(SUPPORTED_SOURCE_HOSTS)
+        raise ValueError(
+            f"Unsupported --source-url host '{host}'. Supported sources: {supported}."
+        )
+
+    source_tag = "propertyfinder" if "propertyfinder" in host else "bayut"
+
+    phrase_candidates: List[str] = []
+    for segment in parsed.path.split("/"):
+        segment = segment.strip()
+        if not segment or re.fullmatch(r"\d+", segment):
+            continue
+        cleaned = normalize_text_phrase(segment)
+        if cleaned:
+            phrase_candidates.append(cleaned)
+
+    query_params = urllib.parse.parse_qs(parsed.query, keep_blank_values=False)
+    for key, values in query_params.items():
+        if key.lower() not in URL_HINT_QUERY_KEYS:
+            continue
+        for value in values:
+            cleaned = normalize_text_phrase(value)
+            if cleaned:
+                phrase_candidates.append(cleaned)
+
+    phrase_candidates = dedupe_strings(phrase_candidates)
+
+    regex_patterns: List[str] = []
+    for phrase in phrase_candidates:
+        regex_patterns.extend(patterns_from_phrase(phrase))
+
+    regex_patterns = dedupe_strings(regex_patterns)
+    if not regex_patterns:
+        raise ValueError(
+            f"Could not infer area/building target from URL '{source_url}'. "
+            "Use --area or --target as fallback."
+        )
+
+    primary_phrase = ""
+    primary_score = -1
+    for phrase in phrase_candidates:
+        score = len(tokenize_phrase(phrase))
+        if score > primary_score:
+            primary_phrase = phrase
+            primary_score = score
+
+    slug = slugify_name(primary_phrase) or f"listing-{index}"
+    target_name = f"{source_tag}-{slug}"[:80]
+    return target_name.strip("-"), regex_patterns
+
+
+def parse_targets(
+    presets: Sequence[str],
+    custom_targets: Sequence[str],
+    areas: Sequence[str],
+    source_urls: Sequence[str],
+) -> List[TargetPattern]:
     target_map: Dict[str, List[str]] = {}
 
-    use_all = not presets and not custom_targets
+    use_all = not presets and not custom_targets and not areas and not source_urls
     selected_presets = list(presets)
     if use_all or any(p.lower() == "all" for p in selected_presets):
         selected_presets = sorted(PRESETS.keys())
@@ -210,6 +441,20 @@ def parse_targets(presets: Sequence[str], custom_targets: Sequence[str]) -> List
             )
         target_map.setdefault(name, []).extend(patterns)
 
+    for raw_area in areas:
+        cleaned_area = normalize_text_phrase(raw_area)
+        patterns = patterns_from_phrase(cleaned_area)
+        name = slugify_name(cleaned_area)
+        if not name or not patterns:
+            raise ValueError(
+                f"Could not build a valid target from --area '{raw_area}'."
+            )
+        target_map.setdefault(name, []).extend(patterns)
+
+    for index, source_url in enumerate(source_urls, start=1):
+        name, patterns = infer_target_from_source_url(source_url, index)
+        target_map.setdefault(name, []).extend(patterns)
+
     if not target_map:
         raise ValueError("No targets were configured.")
 
@@ -218,7 +463,10 @@ def parse_targets(presets: Sequence[str], custom_targets: Sequence[str]) -> List
         compiled.append(
             TargetPattern(
                 name=name,
-                regexes=[re.compile(pattern, re.IGNORECASE) for pattern in patterns],
+                regexes=[
+                    re.compile(pattern, re.IGNORECASE)
+                    for pattern in dedupe_strings(patterns)
+                ],
             )
         )
     return sorted(compiled, key=lambda t: t.name)
@@ -430,6 +678,15 @@ def build_markdown(summary: dict) -> str:
     lines.append(f"- Pages scanned: `{summary['pages_scanned']}`")
     lines.append(f"- Sales rows matched before dedupe: `{summary['raw_matches']}`")
     lines.append(f"- Sales rows after dedupe: `{summary['deduped_matches']}`")
+    lines.append(
+        f"- Targets analyzed: `{', '.join(sorted(summary['targets'].keys()))}`"
+    )
+    if summary.get("input_areas"):
+        lines.append(f"- Area inputs: `{', '.join(summary['input_areas'])}`")
+    if summary.get("input_source_urls"):
+        lines.append("- Source URLs:")
+        for source_url in summary["input_source_urls"]:
+            lines.append(f"  - `{source_url}`")
     lines.append("")
 
     for target_name, target_summary in summary["targets"].items():
@@ -485,7 +742,7 @@ def main() -> int:
 
     try:
         windows = parse_windows(args.windows)
-        targets = parse_targets(args.preset, args.target)
+        targets = parse_targets(args.preset, args.target, args.area, args.source_url)
     except ValueError as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 2
@@ -613,6 +870,8 @@ def main() -> int:
         "lookback_days": args.days,
         "latest_date": latest_date.strftime("%Y-%m-%d"),
         "cutoff_date": cutoff_date.strftime("%Y-%m-%d"),
+        "input_areas": list(args.area),
+        "input_source_urls": list(args.source_url),
         "targets": target_summary,
     }
 

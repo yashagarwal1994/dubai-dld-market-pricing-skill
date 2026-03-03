@@ -1,6 +1,6 @@
 ---
 name: dubai-dld-market-pricing
-description: Analyze Dubai real-estate price movement using the official Dubai DLD open transactions feed on data.dubai. Use when asked whether prices are cooling or rising in specific communities, to compare recent windows versus prior windows (for example 14d or 30d), or to build area-level transaction summaries from DLD data without exposing personal information.
+description: Analyze Dubai real-estate price movement using the official Dubai DLD open transactions feed on data.dubai. Use when asked whether prices are cooling or rising in specific communities, to compare recent windows versus prior windows (for example 14d or 30d), to look up prices for a society/area, or when given a Property Finder/Bayut listing URL to infer the target area from the link without exposing personal information.
 ---
 
 # Dubai DLD Market Pricing
@@ -28,6 +28,21 @@ Use specific presets:
 scripts/dubai_dld_price_trends.py --preset damac-hills-2 --preset jlt --days 120
 ```
 
+Use plain text area/society lookups:
+
+```bash
+scripts/dubai_dld_price_trends.py --area "Jumeirah Village Circle" --area "Emaar South" --days 120
+```
+
+Use listing URLs from Property Finder or Bayut:
+
+```bash
+scripts/dubai_dld_price_trends.py \
+  --source-url "https://www.propertyfinder.ae/en/plp/buy/apartment-for-sale-dubai-jumeirah-lake-towers-jlt-12345678.html" \
+  --source-url "https://www.bayut.com/for-sale/apartments/dubai/jumeirah-lake-towers-jlt/" \
+  --days 120 --windows 14,30
+```
+
 Use custom community matchers:
 
 ```bash
@@ -52,6 +67,7 @@ scripts/dubai_dld_price_trends.py \
 - Use `actual_worth` median as secondary confirmation.
 - Treat outcomes with low counts (`n < 10`) as directional only.
 - If 14-day and 30-day deltas disagree, classify as mixed/noisy.
+- URL-derived targets rely on listing slug/query text; if matching is weak, add `--area` or explicit `--target`.
 
 ## Privacy Rules
 - Do not include private user data in prompts, outputs, or files.
